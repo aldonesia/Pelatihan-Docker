@@ -138,7 +138,7 @@ Aplikasi terdiri dari 5 services dengan konfigurasi replicas:
 #### 2.1 Clone Repository
 - [ ] **Manager Node**: Clone repository
   ```bash
-  git clone https://github.com/arsitektur-jaringan-komputer/Pelatihan-Docker.git
+  git clone https://github.com/aldonesia/Pelatihan-Docker.git
   ```
 - [ ] **Manager Node**: Masuk ke direktori
   ```bash
@@ -339,6 +339,38 @@ Aplikasi terdiri dari 5 services dengan konfigurasi replicas:
 
 #### 7.1 Common Issues
 
+**Masalah: Timeout saat join node ke swarm**
+- Error: `Error response from daemon: Timeout was reached before node joined`
+- [ ] **Verifikasi konektivitas jaringan**
+  - Test ping dari worker ke manager: `ping <ip-manager>`
+  - Test port 2377: `telnet <ip-manager> 2377` atau `nc -zv <ip-manager> 2377`
+- [ ] **Periksa firewall rules**
+  - Buka port 2377/tcp (Swarm management)
+  - Buka port 7946/tcp & 7946/udp (Container network discovery)
+  - Buka port 4789/udp (Overlay network)
+  - Contoh untuk UFW: `sudo ufw allow 2377/tcp && sudo ufw allow 7946/tcp && sudo ufw allow 7946/udp && sudo ufw allow 4789/udp`
+- [ ] **Verifikasi manager node status**
+  - Cek: `docker info | grep -i swarm`
+  - Cek: `docker node ls`
+  - Pastikan manager listening di port 2377: `sudo netstat -tlnp | grep 2377`
+- [ ] **Periksa IP address yang digunakan**
+  - Pastikan menggunakan IP yang dapat diakses dari worker (bukan 127.0.0.1)
+  - Verifikasi dengan: `ip addr show` atau `ifconfig`
+- [ ] **Cek status join di background**
+  - Worker node: `docker info | grep -i swarm`
+  - Manager node: `docker node ls`
+  - Join mungkin berhasil di background meskipun ada timeout error
+- [ ] **Reset dan coba lagi**
+  - Worker: `docker swarm leave --force`
+  - Tunggu beberapa detik, lalu join ulang dengan token baru
+  - Manager: Dapatkan token baru dengan `docker swarm join-token worker`
+- [ ] **Periksa log Docker**
+  - Worker: `sudo journalctl -u docker -n 50`
+  - Manager: `sudo journalctl -u docker -n 50`
+- [ ] **Verifikasi versi Docker**
+  - Semua node harus menggunakan versi yang kompatibel (disarankan 20.10+)
+  - Cek: `docker --version`
+
 **Masalah: Service tidak bisa start**
 - [ ] Cek logs: `docker service logs <service-name>`
 - [ ] Cek node resources: `docker node inspect <node-name>`
@@ -362,6 +394,32 @@ Aplikasi terdiri dari 5 services dengan konfigurasi replicas:
 - [ ] Test registry access: `curl http://<ip-manager>:4000/v2/_catalog`
 - [ ] Restart Docker daemon di worker nodes
 - [ ] Cek firewall rules
+
+**Masalah: Docker tidak bisa start setelah edit daemon.json**
+- Error: `invalid character`, `unexpected end of JSON input`, atau `invalid value`
+- [ ] **Cek error detail**
+  - `sudo systemctl status docker`
+  - `sudo journalctl -u docker -n 50`
+- [ ] **Validasi JSON syntax**
+  - `python3 -m json.tool /etc/docker/daemon.json`
+  - Perbaiki syntax error jika ada
+- [ ] **Periksa kesalahan umum**
+  - Tidak ada trailing comma di akhir array/object
+  - Semua key dan string menggunakan double quotes (bukan single quotes)
+  - Format JSON valid (bukan YAML atau format lain)
+- [ ] **Backup dan perbaiki**
+  - Backup: `sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.backup`
+  - Edit file dengan editor yang aman
+  - Validasi sebelum restart: `python3 -m json.tool /etc/docker/daemon.json`
+  - Restart: `sudo systemctl restart docker`
+- [ ] **Restore dari backup jika perlu**
+  - `sudo rm /etc/docker/daemon.json`
+  - `sudo cp /etc/docker/daemon.json.backup /etc/docker/daemon.json`
+  - Atau buat file baru dengan format minimal: `echo '{"insecure-registries": ["<ip-manager>:4000"]}' | sudo tee /etc/docker/daemon.json`
+- [ ] **Verifikasi setelah perbaikan**
+  - `sudo systemctl status docker`
+  - `docker ps`
+  - `docker info | grep -i "insecure registries"`
 
 **Masalah: NFS mount error**
 - [ ] Verifikasi NFS server running di manager node

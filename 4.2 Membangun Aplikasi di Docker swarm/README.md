@@ -336,6 +336,8 @@ Setelah itu konfigurasi setiap node agar dapat mengakses registry pada jaringan 
 }
 ```
 
+> **⚠️ Penting:** Setelah mengedit `daemon.json`, restart Docker daemon dengan perintah `sudo systemctl restart docker`. Jika Docker tidak bisa start setelah mengedit file ini, lihat bagian [Troubleshooting daemon.json](#troubleshooting-daemonjson) di bawah.
+
 #### 6. Menyiapkan NFS pada Manager Node
 
 Masih ingatkah kalian dengan materi Network File System (NFS) pada [Modul 3](https://github.com/arsitektur-jaringan-komputer/Pelatihan-Docker/tree/master/3.%20Docker%20Service%20Lanjutan). Penggunaan NFS pada docker swarm sangatlah penting, khususnya agar ketika aplikasi dideploy ulang, isi dari database tidak hilang. Selain itu ketika memiliki lebih dari 1 sistem database, maka dapat dipastikan bahwa isinya sama.
@@ -414,6 +416,495 @@ Untuk mengecek aplikasi telah berjalan dengan sesuai atau tidak, dapat menjalank
 Selain itu, karena aplikasi ini berbasis web, aplikasi dapat dicek melalui web browser dengan memasukkan domain atau alamat IP manager.
 
 ![Tampilan Aplikasi](img/app-login.png)
+
+### Troubleshooting
+
+#### Error: Timeout was reached before node joined
+
+Jika Anda mendapatkan error berikut saat mencoba join worker node ke Docker Swarm:
+```
+Error response from daemon: Timeout was reached before node joined. 
+The attempt to join the swarm will continue in the background. 
+Use the "docker info" command to see the current swarm status of your node.
+```
+
+Berikut adalah langkah-langkah untuk mengatasi masalah ini:
+
+##### 1. Verifikasi Konektivitas Jaringan
+
+Pastikan worker node dapat mengakses manager node:
+
+**Di Worker Node:**
+```bash
+# Test koneksi ke manager node
+ping <ip-address-manager>
+
+# Test koneksi ke port swarm (2377)
+telnet <ip-address-manager> 2377
+# atau
+nc -zv <ip-address-manager> 2377
+```
+
+Jika ping atau telnet gagal, periksa:
+- Apakah IP address manager node benar?
+- Apakah kedua node berada dalam jaringan yang sama?
+- Apakah ada masalah dengan routing jaringan?
+
+##### 2. Periksa Firewall Rules
+
+Docker Swarm memerlukan beberapa port yang harus terbuka:
+
+**Port yang diperlukan:**
+- **2377/tcp**: Swarm management
+- **7946/tcp & 7946/udp**: Container network discovery
+- **4789/udp**: Overlay network (VXLAN)
+
+**Di Manager Node:**
+```bash
+# Untuk UFW (Ubuntu)
+sudo ufw allow 2377/tcp
+sudo ufw allow 7946/tcp
+sudo ufw allow 7946/udp
+sudo ufw allow 4789/udp
+
+# Untuk firewalld (CentOS/RHEL)
+sudo firewall-cmd --add-port=2377/tcp --permanent
+sudo firewall-cmd --add-port=7946/tcp --permanent
+sudo firewall-cmd --add-port=7946/udp --permanent
+sudo firewall-cmd --add-port=4789/udp --permanent
+sudo firewall-cmd --reload
+
+# Untuk iptables
+sudo iptables -A INPUT -p tcp --dport 2377 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 7946 -j ACCEPT
+sudo iptables -A INPUT -p udp --dport 7946 -j ACCEPT
+sudo iptables -A INPUT -p udp --dport 4789 -j ACCEPT
+```
+
+**Di Worker Node:**
+```bash
+# Buka port yang sama di worker node
+sudo ufw allow 7946/tcp
+sudo ufw allow 7946/udp
+sudo ufw allow 4789/udp
+```
+
+##### 3. Verifikasi Manager Node Status
+
+**Di Manager Node:**
+```bash
+# Cek status swarm
+docker info | grep -i swarm
+
+# Cek node yang sudah terhubung
+docker node ls
+
+# Cek apakah manager node listening di port 2377
+sudo netstat -tlnp | grep 2377
+# atau
+sudo ss -tlnp | grep 2377
+```
+
+Pastikan manager node menunjukkan status "Active" dan "Leader".
+
+##### 4. Periksa IP Address yang Digunakan
+
+Pastikan Anda menggunakan IP address yang benar saat inisiasi swarm:
+
+**Di Manager Node:**
+```bash
+# Lihat semua IP address
+ip addr show
+# atau
+ifconfig
+
+# Pastikan menggunakan IP yang dapat diakses dari worker node
+docker swarm init --advertise-addr <ip-address-yang-benar>
+```
+
+**Catatan:** Gunakan IP address yang dapat diakses dari worker node, bukan `127.0.0.1` atau `localhost`.
+
+##### 5. Cek Status Join di Background
+
+Karena error message menyebutkan bahwa join akan dilanjutkan di background, periksa status:
+
+**Di Worker Node:**
+```bash
+# Cek status swarm
+docker info | grep -i swarm
+
+# Cek apakah node sudah terhubung
+docker node ls
+```
+
+Jika node sudah terhubung, Anda akan melihat status "Ready" dan "Active".
+
+##### 6. Reset dan Coba Lagi
+
+Jika masalah masih terjadi, coba reset dan join ulang:
+
+**Di Worker Node:**
+```bash
+# Leave swarm (jika sudah pernah join)
+docker swarm leave --force
+
+# Tunggu beberapa detik, lalu coba join lagi
+docker swarm join --token <swarm-token> <ip-address-manager>:2377
+```
+
+**Di Manager Node:**
+```bash
+# Jika perlu, dapatkan token baru
+docker swarm join-token worker
+```
+
+##### 7. Periksa Log Docker
+
+**Di Worker Node:**
+```bash
+# Cek log Docker daemon
+sudo journalctl -u docker -n 50
+# atau
+sudo tail -f /var/log/docker.log
+```
+
+**Di Manager Node:**
+```bash
+# Cek log Docker daemon
+sudo journalctl -u docker -n 50
+```
+
+##### 8. Verifikasi Versi Docker
+
+Pastikan semua node menggunakan versi Docker yang kompatibel:
+
+**Di Semua Node:**
+```bash
+docker --version
+```
+
+Disarankan menggunakan Docker versi 20.10 atau lebih baru untuk kompatibilitas yang lebih baik.
+
+##### 9. Test dengan IP Address Langsung
+
+Coba gunakan IP address secara eksplisit:
+
+**Di Worker Node:**
+```bash
+# Gunakan IP address secara eksplisit (bukan hostname)
+docker swarm join --token <swarm-token> <ip-address-manager>:2377
+```
+
+##### 10. Periksa Resource Node
+
+Pastikan node memiliki resource yang cukup:
+
+**Di Worker Node:**
+```bash
+# Cek memory
+free -h
+
+# Cek disk space
+df -h
+
+# Cek CPU
+top
+```
+
+##### Solusi Cepat (Quick Fix)
+
+Jika semua langkah di atas sudah dilakukan dan masih error, coba langkah berikut:
+
+1. **Di Manager Node:**
+   ```bash
+   # Pastikan swarm sudah init dengan IP yang benar
+   docker swarm init --advertise-addr <ip-address-manager>
+   ```
+
+2. **Di Worker Node:**
+   ```bash
+   # Leave swarm jika perlu
+   docker swarm leave --force
+   
+   # Tunggu 10 detik
+   sleep 10
+   
+   # Join dengan verbose untuk melihat detail error
+   docker swarm join --token <swarm-token> <ip-address-manager>:2377
+   ```
+
+3. **Verifikasi:**
+   ```bash
+   # Di Manager Node
+   docker node ls
+   
+   # Di Worker Node
+   docker info | grep -i swarm
+   ```
+
+Jika masalah masih berlanjut setelah semua langkah di atas, kemungkinan ada masalah dengan:
+- Konfigurasi jaringan yang lebih kompleks (NAT, VPN, dll)
+- Security policies yang memblokir komunikasi
+- Masalah hardware atau infrastruktur
+
+#### Troubleshooting daemon.json
+
+Jika Docker tidak bisa start setelah mengedit `/etc/docker/daemon.json`, ikuti langkah-langkah berikut:
+
+##### 1. Cek Error Docker Daemon
+
+**Di Semua Node:**
+```bash
+# Cek status Docker
+sudo systemctl status docker
+
+# Cek log Docker untuk melihat error detail
+sudo journalctl -u docker -n 50
+# atau
+sudo tail -n 50 /var/log/docker.log
+```
+
+Error yang umum muncul:
+- `invalid character` → Syntax error dalam JSON
+- `unexpected end of JSON input` → JSON tidak lengkap
+- `invalid value` → Nilai konfigurasi tidak valid
+
+##### 2. Validasi Syntax JSON
+
+File `daemon.json` harus berupa JSON yang valid. Periksa syntax dengan:
+
+**Di Semua Node:**
+```bash
+# Validasi JSON syntax
+python3 -m json.tool /etc/docker/daemon.json
+# atau
+cat /etc/docker/daemon.json | python3 -m json.tool
+```
+
+Jika ada error, perbaiki syntax JSON terlebih dahulu.
+
+##### 3. Kesalahan Umum dalam daemon.json
+
+**❌ SALAH - Trailing comma:**
+```json
+{
+  "insecure-registries": ["<ip-manager>:4000"],  // ← comma di akhir tidak boleh
+}
+```
+
+**✅ BENAR:**
+```json
+{
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+**❌ SALAH - Missing quotes:**
+```json
+{
+  insecure-registries: ["<ip-manager>:4000"]  // ← harus pakai quotes
+}
+```
+
+**✅ BENAR:**
+```json
+{
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+**❌ SALAH - Single quotes:**
+```json
+{
+  'insecure-registries': ['<ip-manager>:4000']  // ← JSON harus pakai double quotes
+}
+```
+
+**✅ BENAR:**
+```json
+{
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+**❌ SALAH - Multiple entries tanpa merge:**
+Jika file sudah ada isinya, jangan overwrite, tapi merge:
+
+**Jika file sudah ada seperti ini:**
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m"
+  }
+}
+```
+
+**❌ JANGAN buat file baru, tapi tambahkan insecure-registries:**
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m"
+  },
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+##### 4. Perbaiki File daemon.json
+
+**Langkah 1: Backup file yang rusak**
+```bash
+sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.backup
+```
+
+**Langkah 2: Edit file dengan editor yang aman**
+```bash
+sudo nano /etc/docker/daemon.json
+# atau
+sudo vi /etc/docker/daemon.json
+```
+
+**Langkah 3: Pastikan format JSON benar**
+
+**Jika file tidak ada atau kosong, buat dengan format:**
+```json
+{
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+**Jika file sudah ada, tambahkan `insecure-registries` ke dalam object yang sudah ada:**
+```json
+{
+  "existing-config": "value",
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+**Langkah 4: Validasi sebelum restart**
+```bash
+# Validasi JSON
+python3 -m json.tool /etc/docker/daemon.json
+
+# Jika tidak ada error, lanjut restart
+sudo systemctl restart docker
+```
+
+##### 5. Restore dari Backup
+
+Jika Docker masih tidak bisa start setelah perbaikan:
+
+**Di Semua Node:**
+```bash
+# Hapus file yang rusak
+sudo rm /etc/docker/daemon.json
+
+# Restore dari backup (jika ada)
+sudo cp /etc/docker/daemon.json.backup /etc/docker/daemon.json
+
+# Atau buat file baru dengan format minimal
+echo '{}' | sudo tee /etc/docker/daemon.json
+
+# Restart Docker
+sudo systemctl restart docker
+```
+
+##### 6. Contoh File daemon.json yang Benar
+
+**Minimal (hanya insecure-registries):**
+```json
+{
+  "insecure-registries": ["192.168.1.100:4000"]
+}
+```
+
+**Dengan beberapa registry:**
+```json
+{
+  "insecure-registries": [
+    "192.168.1.100:4000",
+    "10.0.0.50:5000"
+  ]
+}
+```
+
+**Dengan konfigurasi tambahan:**
+```json
+{
+  "insecure-registries": ["192.168.1.100:4000"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
+
+##### 7. Verifikasi Setelah Perbaikan
+
+**Di Semua Node:**
+```bash
+# Cek status Docker
+sudo systemctl status docker
+
+# Test Docker berfungsi
+docker ps
+
+# Verifikasi konfigurasi
+docker info | grep -i "insecure registries"
+```
+
+##### 8. Solusi Cepat (Quick Fix)
+
+Jika Docker tidak bisa start dan Anda perlu segera memperbaikinya:
+
+```bash
+# 1. Hapus file daemon.json yang rusak
+sudo rm /etc/docker/daemon.json
+
+# 2. Buat file baru dengan format minimal yang benar
+sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+{
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+EOF
+
+# 3. Set permission yang benar
+sudo chmod 644 /etc/docker/daemon.json
+
+# 4. Validasi JSON
+python3 -m json.tool /etc/docker/daemon.json
+
+# 5. Restart Docker
+sudo systemctl restart docker
+
+# 6. Verifikasi
+sudo systemctl status docker
+docker ps
+```
+
+**Catatan:** Ganti `<ip-manager>` dengan IP address manager node yang sebenarnya.
+
+##### 9. Tips Pencegahan
+
+1. **Selalu backup sebelum edit:**
+   ```bash
+   sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.backup
+   ```
+
+2. **Validasi JSON sebelum restart:**
+   ```bash
+   python3 -m json.tool /etc/docker/daemon.json
+   ```
+
+3. **Gunakan editor yang mendukung JSON:**
+   - `nano`, `vi`, atau `vim` dengan syntax highlighting
+   - Atau gunakan editor berbasis GUI yang validasi JSON otomatis
+
+4. **Test di satu node dulu:**
+   - Edit dan test di satu node terlebih dahulu
+   - Jika berhasil, baru terapkan ke node lainnya
 
 ### Tambahan
 
