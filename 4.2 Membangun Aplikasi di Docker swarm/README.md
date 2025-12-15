@@ -407,6 +407,8 @@ Apa itu Docker Stack? Docker Stack ada sekelompok machine yang tersebar di selur
 docker stack deploy -c <path-ke-docker-compose> <nama-stack>
 ```
 
+> **⚠️ Penting:** Pastikan file `docker-compose.yaml` tidak menggunakan `container_name` jika service memiliki `deploy.replicas`. Docker Swarm akan otomatis membuat nama container yang unik untuk setiap replica. Jika Anda mendapatkan error `can't set container_name and backend as container name must be unique`, hapus semua `container_name` dari file `docker-compose.yaml`.
+
 #### 9. Cek Aplikasi
 
 Untuk mengecek aplikasi telah berjalan dengan sesuai atau tidak, dapat menjalankan perintah **`docker stack services <nama-stack>`** lalu pastikan bahwa semua service telah ter-replika dengan sempurna (jumlah replika saat ini sama dengan jumlah replika yang telah disesuaikan pada **`docker-compose.yaml`**)
@@ -646,6 +648,82 @@ Jika masalah masih berlanjut setelah semua langkah di atas, kemungkinan ada masa
 - Konfigurasi jaringan yang lebih kompleks (NAT, VPN, dll)
 - Security policies yang memblokir komunikasi
 - Masalah hardware atau infrastruktur
+
+#### Error: container_name dengan replicas
+
+Jika Anda mendapatkan error berikut saat deploy stack:
+```
+services.deploy.replicas: can't set container_name and backend as container name must be unique: invalid compose project
+```
+
+**Penyebab:**
+Di Docker Swarm, ketika menggunakan `deploy.replicas`, Anda tidak bisa menggunakan `container_name` karena Docker Swarm perlu membuat beberapa container dengan nama yang unik. Setiap replica akan mendapatkan nama otomatis seperti `musicapp_backend.1`, `musicapp_backend.2`, dll.
+
+**Solusi:**
+
+1. **Hapus semua `container_name` dari docker-compose.yaml**
+
+   Buka file `docker-compose.yaml` dan hapus semua baris yang berisi `container_name:`.
+
+   **❌ SALAH:**
+   ```yaml
+   backend:
+     container_name: backend  # ← HAPUS BARIS INI
+     deploy:
+       replicas: 2
+   ```
+
+   **✅ BENAR:**
+   ```yaml
+   backend:
+     deploy:
+       replicas: 2
+   ```
+
+2. **Hapus juga `restart: always` jika ada**
+
+   Jika menggunakan `deploy.restart_policy`, jangan gunakan `restart: always` di level service.
+
+   **❌ SALAH:**
+   ```yaml
+   db:
+     restart: always  # ← HAPUS BARIS INI jika ada deploy.restart_policy
+     deploy:
+       restart_policy:
+         condition: on-failure
+   ```
+
+   **✅ BENAR:**
+   ```yaml
+   db:
+     deploy:
+       restart_policy:
+         condition: on-failure
+   ```
+
+3. **Verifikasi file docker-compose.yaml**
+
+   Setelah menghapus `container_name`, validasi file dengan:
+   ```bash
+   docker stack deploy -c docker-compose.yaml --dry-run musicapp
+   ```
+
+   Atau cek syntax dengan:
+   ```bash
+   docker compose config
+   ```
+
+4. **Deploy ulang stack**
+
+   ```bash
+   docker stack deploy -c docker-compose.yaml musicapp
+   ```
+
+**Catatan Penting:**
+- Di Docker Swarm, container names akan otomatis dibuat dengan format: `<stack-name>_<service-name>.<replica-number>`
+- Contoh: `musicapp_backend.1`, `musicapp_backend.2`, `musicapp_frontend.1`, dll.
+- Untuk melihat container names yang dibuat, gunakan: `docker stack ps musicapp`
+- `depends_on` juga tidak bekerja di Docker Swarm mode (akan diabaikan), tapi tidak menyebabkan error
 
 #### Troubleshooting daemon.json
 

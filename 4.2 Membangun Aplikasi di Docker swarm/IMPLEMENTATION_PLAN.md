@@ -395,6 +395,22 @@ Aplikasi terdiri dari 5 services dengan konfigurasi replicas:
 - [ ] Restart Docker daemon di worker nodes
 - [ ] Cek firewall rules
 
+**Masalah: Error container_name dengan replicas**
+- Error: `services.deploy.replicas: can't set container_name and backend as container name must be unique: invalid compose project`
+- [ ] **Hapus semua container_name dari docker-compose.yaml**
+  - Buka file `docker-compose.yaml`
+  - Hapus semua baris yang berisi `container_name:`
+  - Container names akan otomatis dibuat oleh Docker Swarm dengan format `<stack-name>_<service-name>.<replica-number>`
+- [ ] **Hapus restart: always jika ada**
+  - Jika menggunakan `deploy.restart_policy`, jangan gunakan `restart: always` di level service
+- [ ] **Validasi file**
+  - `docker compose config` (untuk cek syntax)
+  - Atau `docker stack deploy -c docker-compose.yaml --dry-run musicapp`
+- [ ] **Deploy ulang stack**
+  - `docker stack deploy -c docker-compose.yaml musicapp`
+- [ ] **Verifikasi container names**
+  - `docker stack ps musicapp` untuk melihat nama container yang dibuat otomatis
+
 **Masalah: Docker tidak bisa start setelah edit daemon.json**
 - Error: `invalid character`, `unexpected end of JSON input`, atau `invalid value`
 - [ ] **Cek error detail**

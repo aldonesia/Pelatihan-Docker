@@ -8,12 +8,10 @@ services:
           - node.role == worker
       restart_policy:
         condition: on-failure
-    container_name: db
     build:
       context: ./database
       dockerfile: Dockerfile
     image: <ip-manager>:4000/database
-    restart: always
     environment:
       POSTGRES_USER: docker
       POSTGRES_PASSWORD: docker
@@ -24,7 +22,6 @@ services:
       - db-network
 
   backend:
-    container_name: backend
     deploy:
       replicas: 2
       placement:
@@ -59,7 +56,6 @@ services:
       - api-network
 
   frontend:
-    container_name: frontend
     deploy:
       replicas: 2
       placement:
@@ -79,7 +75,6 @@ services:
       - web-network
 
   nginx-frontend:
-    container_name: nginx-frontend
     deploy:
       replicas: 1
       placement:
@@ -99,7 +94,6 @@ services:
       - web-network
 
   nginx-backend:
-    container_name: nginx-backend
     deploy:
       replicas: 1
       placement:
