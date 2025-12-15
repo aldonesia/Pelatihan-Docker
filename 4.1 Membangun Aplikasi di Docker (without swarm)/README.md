@@ -147,7 +147,7 @@ Untuk implementasi microservice dengan Docker Compose kali ini akan menggunakan 
 
 Secara umum, gambaran tentang arsitektur aplikasi yang akan digunakan seperti berikut.
 
-![Arsitektur App](../img/app-arch.png)
+![Arsitektur App](./img/app-arch.png)
 
 Pada gambar tersebut terdapat 5 services (**`nginx-frontend`**, **`frontend`**, **`nginx-backend`**, **`backend`**, dan **`database`**). **`nginx-frontend`** dan **`nginx-backend`** sama-sama bertugas sebagai web-server (penjelasan tentang masing-masing istilah dapat dilihat pada subbab [Pengantar Aplikasi Web](#pengantar-aplikasi-web)). **`nginx-frontend`** berjalan pada port **3000** dan **`nginx-backend`** berjalan pada port **8000**. Alur aplikasinya sebagai berikut:
 
@@ -164,7 +164,7 @@ Pada gambar tersebut terdapat 5 services (**`nginx-frontend`**, **`frontend`**, 
 Implementasi microservice kali ini menggunakan aplikasi yang tersedia pada folder [compose](compose) di repository ini dengan melakukan cloning.
 
 ```
-git clone https://github.com/arsitektur-jaringan-komputer/Pelatihan-Docker.git
+git clone https://github.com/aldonesia/Pelatihan-Docker.git
 ```
 
 Lalu masuk ke directory **`Pelatihan-Docker/4. Membangun Aplikasi di Docker/4.1 Membangun Aplikasi di Docker (without swarm)/compose/`** dan aplikasi siap untuk diimplementasikan.
