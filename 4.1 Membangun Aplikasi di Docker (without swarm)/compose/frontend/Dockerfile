@@ -3,7 +3,7 @@ FROM node:16
 WORKDIR /usr/src/frontend
 
 # Build arguments for environment variables
-ARG NEXT_PUBLIC_API_ENDPOINT=http://localhost:8000/
+ARG NEXT_PUBLIC_API_ENDPOINT=http://localhost:8080/
 ARG NEXT_PUBLIC_APP_NAME=Music App
 
 # Set environment variables

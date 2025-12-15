@@ -47,8 +47,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_ENDPOINT=http://localhost:8000/
-        - NEXT_PUBLIC_APP_NAME=Music App
+        NEXT_PUBLIC_API_ENDPOINT: http://localhost:8080/
+        NEXT_PUBLIC_APP_NAME: Music App
     depends_on:
       - backend
     volumes:
@@ -61,7 +61,7 @@ services:
     depends_on:
       - frontend
     ports:
-      - '3000:80'
+      - '80:80'
     build:
       context: ./nginx
       dockerfile: Dockerfile-frontend
@@ -73,7 +73,7 @@ services:
     depends_on:
       - backend
     ports:
-      - '8000:8080'
+      - '8080:8080'
     build:
       context: ./nginx
       dockerfile: Dockerfile-backend

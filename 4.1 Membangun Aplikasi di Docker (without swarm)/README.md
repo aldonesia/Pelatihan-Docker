@@ -149,7 +149,7 @@ Secara umum, gambaran tentang arsitektur aplikasi yang akan digunakan seperti be
 
 ![Arsitektur App](./img/app-arch.png)
 
-Pada gambar tersebut terdapat 5 services (**`nginx-frontend`**, **`frontend`**, **`nginx-backend`**, **`backend`**, dan **`database`**). **`nginx-frontend`** dan **`nginx-backend`** sama-sama bertugas sebagai web-server (penjelasan tentang masing-masing istilah dapat dilihat pada subbab [Pengantar Aplikasi Web](#pengantar-aplikasi-web)). **`nginx-frontend`** berjalan pada port **3000** dan **`nginx-backend`** berjalan pada port **8000**. Alur aplikasinya sebagai berikut:
+Pada gambar tersebut terdapat 5 services (**`nginx-frontend`**, **`frontend`**, **`nginx-backend`**, **`backend`**, dan **`database`**). **`nginx-frontend`** dan **`nginx-backend`** sama-sama bertugas sebagai web-server (penjelasan tentang masing-masing istilah dapat dilihat pada subbab [Pengantar Aplikasi Web](#pengantar-aplikasi-web)). **`nginx-frontend`** berjalan pada port **80** dan **`nginx-backend`** berjalan pada port **8080**. Alur aplikasinya sebagai berikut:
 
 1. Pada client side, client akan mengakses aplikasi menggunakan web browser masing-masing.
 2. Web browser akan meneruskan permintaan client ke server, selanjutnya akan diurus oleh server (client sudah tidak perlu melakukan apa-apa lagi).
@@ -189,16 +189,16 @@ Atau buat file **`.env`** secara manual dengan isi berikut:
 
 ```
 NEXT_PUBLIC_APP_NAME="Music App"
-NEXT_PUBLIC_API_ENDPOINT="http://localhost:8000/" 
+NEXT_PUBLIC_API_ENDPOINT="http://localhost:8080/" 
 ```
 
 **Penjelasan:**
 * **`NEXT_PUBLIC_APP_NAME`**: Nama dari aplikasi yang akan ditampilkan di Frontend
-* **`NEXT_PUBLIC_API_ENDPOINT`**: Alamat dari web server untuk **`backend`** (menggunakan port 8000). 
-  - Untuk localhost: `http://localhost:8000/`
-  - Untuk server remote: `http://<ip-server>:8000/` atau `http://<domain-name>:8000/`
+* **`NEXT_PUBLIC_API_ENDPOINT`**: Alamat dari web server untuk **`backend`** (menggunakan port 8080). 
+  - Untuk localhost: `http://localhost:8080/`
+  - Untuk server remote: `http://<ip-server>:8080/` atau `http://<domain-name>:8080/`
 
-> **Penting**: Pastikan **`NEXT_PUBLIC_API_ENDPOINT`** menggunakan port **8000** (bukan 5000) dan diakhiri dengan slash (`/`). File **`.env`** harus dibuat sebelum melakukan build frontend.
+> **Penting**: Pastikan **`NEXT_PUBLIC_API_ENDPOINT`** menggunakan port **8080** dan diakhiri dengan slash (`/`). File **`.env`** harus dibuat sebelum melakukan build frontend.
 
 #### 4. Build dan Menjalankan Aplikasi
 
@@ -234,7 +234,7 @@ docker compose ps
 
 Perintah ini akan menampilkan status dari semua container yang sedang berjalan. Pastikan bahwa semua container memiliki status **`Up`**.
 
-Selain itu, karena aplikasi ini berbasis web, aplikasi dapat dicek melalui web browser dengan memasukkan alamat **`http://localhost:3000`** atau **`http://<ip-server>:3000`**.
+Selain itu, karena aplikasi ini berbasis web, aplikasi dapat dicek melalui web browser dengan memasukkan alamat **`http://localhost`** atau **`http://<ip-server>`**.
 
 ![Tampilan Aplikasi](../img/app-login.png)
 
