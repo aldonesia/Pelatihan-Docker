@@ -373,6 +373,8 @@ Pada file **`docker-compose.yaml`**, **`<ip-manager>`** harus diganti menjadi al
 docker compose build
 ```
 
+> **⚠️ Catatan:** Jika Anda mendapatkan error `404 Not Found` saat build yang terkait dengan Debian repositories (seperti `http://deb.debian.org/debian buster Release`), ini berarti base image menggunakan Debian Buster yang sudah tidak didukung. Dockerfile sudah diperbarui untuk menggunakan Node.js 18 yang menggunakan Debian versi yang lebih baru. Jika masih mengalami masalah, lihat bagian [Troubleshooting Build Error](#troubleshooting-build-error) di bawah.
+
 Setelah proses build selesai, semua images dapat dipastikan telah ter-*build* dengan menjalankan perintah berikut (total akan ada 5 images untuk service dan 1 image registry pada aplikasi ini).
 
 ```
@@ -983,6 +985,435 @@ docker ps
 4. **Test di satu node dulu:**
    - Edit dan test di satu node terlebih dahulu
    - Jika berhasil, baru terapkan ke node lainnya
+
+#### Troubleshooting Build Error
+
+Jika Anda mendapatkan error berikut saat build Docker image:
+
+```
+Err:4 http://deb.debian.org/debian buster Release
+   404  Not Found [IP: 146.75.46.132 80]
+E: The repository 'http://deb.debian.org/debian buster Release' does not have a Release file.
+```
+
+**Penyebab:**
+Base image menggunakan Debian Buster yang sudah mencapai end-of-life. Repository Debian Buster telah dipindahkan ke archive dan tidak lagi tersedia di URL standar.
+
+**Solusi:**
+
+##### 1. Update Base Image (Solusi yang Disarankan)
+
+Update Dockerfile untuk menggunakan base image yang lebih baru:
+
+**❌ SALAH (menggunakan Node.js 14 dengan Debian Buster):**
+```dockerfile
+FROM node:14
+```
+
+**✅ BENAR (menggunakan Node.js 18 dengan Debian Bullseye):**
+```dockerfile
+FROM node:18
+```
+
+Dockerfile di repository ini sudah diperbarui untuk menggunakan Node.js 18.
+
+##### 2. Alternatif: Update APT Sources untuk Debian Buster
+
+Jika Anda harus tetap menggunakan Node.js 14 atau base image berbasis Debian Buster, update sources list:
+
+**Di Dockerfile, tambahkan sebelum `apt-get update`:**
+```dockerfile
+FROM node:14
+
+# Update sources untuk Debian Buster (archived)
+RUN sed -i 's/deb.debian.org/archive.debian.org/g' /etc/apt/sources.list && \
+    sed -i '/security.debian.org/d' /etc/apt/sources.list
+
+WORKDIR /usr/src/backend
+
+COPY package*.json ./
+
+RUN npm install --production
+RUN apt-get update && \
+    apt-get install -y net-tools postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
+```
+
+**Catatan:** Solusi ini hanya untuk sementara. Disarankan untuk upgrade ke base image yang lebih baru.
+
+##### 3. Verifikasi Setelah Perbaikan
+
+Setelah memperbarui Dockerfile:
+
+```bash
+# Build ulang image
+docker compose build
+
+# Verifikasi image berhasil di-build
+docker images
+
+# Test image
+docker run --rm <image-name> <command>
+```
+
+##### 4. Tips Pencegahan
+
+1. **Gunakan base image yang masih didukung:**
+   - Node.js: gunakan versi 18 atau lebih baru
+   - Debian: gunakan Bullseye (11) atau Bookworm (12)
+   - Ubuntu: gunakan versi LTS terbaru
+
+2. **Cek status base image:**
+   - Kunjungi https://hub.docker.com untuk melihat versi terbaru
+   - Periksa dokumentasi resmi untuk informasi end-of-life
+
+3. **Bersihkan apt cache:**
+   - Selalu tambahkan `rm -rf /var/lib/apt/lists/*` setelah `apt-get install` untuk mengurangi ukuran image
+
+4. **Gunakan multi-stage build:**
+   - Pisahkan build dependencies dari runtime dependencies
+   - Gunakan image yang lebih kecil untuk production
+
+#### Troubleshooting Next.js Build Error dengan Node.js 18
+
+Jika Anda mendapatkan error berikut saat build frontend:
+
+```
+Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: Package subpath './lib/parser' is not defined by "exports" in /usr/src/frontend/node_modules/postcss/package.json
+```
+
+**Penyebab:**
+Next.js 10.0.6 tidak sepenuhnya kompatibel dengan Node.js 18 karena masalah PostCSS module resolution. Node.js 18 memiliki ESM module resolution yang lebih ketat dibandingkan Node.js 16.
+
+**Solusi:**
+
+##### 1. Gunakan Node.js 16 untuk Frontend (Solusi yang Disarankan)
+
+Next.js 10.0.6 lebih kompatibel dengan Node.js 16. Update Dockerfile frontend:
+
+**✅ BENAR:**
+```dockerfile
+FROM node:16
+
+WORKDIR /usr/src/frontend
+
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies) for build
+RUN npm install
+
+# Install sharp explicitly (required by Next.js for image optimization)
+RUN npm install sharp
+
+COPY . .
+
+# Build the application
+RUN npm run build
+
+EXPOSE 3000
+
+CMD [ "npm", "start" ]
+```
+
+**Catatan:** Node.js 16 LTS menggunakan Debian Bullseye yang masih didukung, jadi tidak akan ada masalah dengan repository Debian.
+
+##### 2. Install Semua Dependencies untuk Build
+
+Pastikan menggunakan `npm install` (bukan `npm install --production`) karena Next.js memerlukan devDependencies untuk build:
+
+**❌ SALAH:**
+```dockerfile
+RUN npm install --production  # ← devDependencies tidak terinstall
+```
+
+**✅ BENAR:**
+```dockerfile
+RUN npm install  # ← Install semua dependencies termasuk devDependencies
+```
+
+##### 3. Install Sharp Explicitly
+
+Next.js memerlukan `sharp` untuk image optimization. Install secara eksplisit:
+
+```dockerfile
+RUN npm install sharp
+```
+
+##### 4. Alternatif: Update Next.js (Jika Memungkinkan)
+
+Jika aplikasi memungkinkan, update Next.js ke versi yang lebih baru yang kompatibel dengan Node.js 18:
+
+```json
+{
+  "dependencies": {
+    "next": "^12.0.0"  // atau versi lebih baru
+  }
+}
+```
+
+**Catatan:** Update Next.js mungkin memerlukan perubahan kode aplikasi. Pastikan untuk melakukan testing yang menyeluruh.
+
+##### 5. Verifikasi Setelah Perbaikan
+
+Setelah memperbarui Dockerfile:
+
+```bash
+# Build ulang image
+docker compose build frontend
+
+# Verifikasi build berhasil
+docker images | grep frontend
+
+# Test image
+docker run --rm <frontend-image-name> npm start
+```
+
+**Catatan Penting:**
+- Backend dapat tetap menggunakan Node.js 18 karena tidak menggunakan PostCSS
+- Frontend menggunakan Node.js 16 untuk kompatibilitas dengan Next.js 10
+- Kedua versi Node.js (16 dan 18) menggunakan Debian Bullseye yang masih didukung
+
+#### Troubleshooting Image Not Found
+
+Jika Anda mendapatkan error berikut saat deploy stack:
+
+```
+No such image: 192.168.64.19:4000/database:latest
+```
+
+Atau melihat status service seperti:
+
+```
+musicapp_db.1   Shutdown   Rejected   "No such image: 192.168.64.19:4000/database:latest"
+```
+
+**Penyebab:**
+Worker node tidak dapat menemukan image di registry. Ini bisa terjadi karena:
+1. Images belum di-push ke registry
+2. Images di-push dengan tag yang salah
+3. Registry tidak dapat diakses dari worker node
+4. Konfigurasi insecure-registries tidak benar di worker node
+
+**Solusi:**
+
+##### 1. Verifikasi Images Sudah Di-push ke Registry
+
+**Di Manager Node:**
+```bash
+# Cek images yang ada di registry
+curl -X GET http://<ip-manager>:4000/v2/_catalog | json_pp
+
+# Atau cek dengan detail
+curl -X GET http://<ip-manager>:4000/v2/<image-name>/tags/list
+```
+
+Pastikan semua images yang diperlukan ada di registry:
+- database
+- backend
+- frontend
+- nginx-frontend
+- nginx-backend
+
+##### 2. Tag dan Push Images dengan Benar
+
+**Di Manager Node:**
+
+**Langkah 1: Pastikan images sudah di-build**
+```bash
+docker images
+```
+
+**Langkah 2: Tag images dengan format yang benar**
+```bash
+# Tag images dengan registry prefix
+docker tag database <ip-manager>:4000/database
+docker tag backend <ip-manager>:4000/backend
+docker tag frontend <ip-manager>:4000/frontend
+docker tag nginx-frontend <ip-manager>:4000/nginx-frontend
+docker tag nginx-backend <ip-manager>:4000/nginx-backend
+
+# Atau gunakan :latest tag secara eksplisit
+docker tag database <ip-manager>:4000/database:latest
+docker tag backend <ip-manager>:4000/backend:latest
+docker tag frontend <ip-manager>:4000/frontend:latest
+docker tag nginx-frontend <ip-manager>:4000/nginx-frontend:latest
+docker tag nginx-backend <ip-manager>:4000/nginx-backend:latest
+```
+
+**Langkah 3: Push images ke registry**
+```bash
+docker push <ip-manager>:4000/database
+docker push <ip-manager>:4000/backend
+docker push <ip-manager>:4000/frontend
+docker push <ip-manager>:4000/nginx-frontend
+docker push <ip-manager>:4000/nginx-backend
+```
+
+**Atau gunakan docker compose push:**
+```bash
+# Pastikan docker-compose.yaml sudah menggunakan IP yang benar
+docker compose push
+```
+
+##### 3. Verifikasi Registry Dapat Diakses dari Worker Node
+
+**Di Worker Node:**
+```bash
+# Test koneksi ke registry
+curl http://<ip-manager>:4000/v2/_catalog
+
+# Test pull image (opsional)
+docker pull <ip-manager>:4000/database
+```
+
+Jika curl atau pull gagal, periksa:
+- Network connectivity antara worker dan manager
+- Firewall rules (port 4000 harus terbuka)
+- Registry container berjalan di manager node
+
+##### 4. Verifikasi Konfigurasi Insecure Registry
+
+**Di Semua Worker Node:**
+
+**Langkah 1: Cek file daemon.json**
+```bash
+cat /etc/docker/daemon.json
+```
+
+Pastikan berisi:
+```json
+{
+  "insecure-registries": ["<ip-manager>:4000"]
+}
+```
+
+**Langkah 2: Restart Docker daemon**
+```bash
+sudo systemctl restart docker
+```
+
+**Langkah 3: Verifikasi konfigurasi**
+```bash
+docker info | grep -i "insecure registries"
+```
+
+##### 5. Update docker-compose.yaml dengan Tag Eksplisit
+
+Jika masalah masih terjadi, tambahkan tag `:latest` secara eksplisit di docker-compose.yaml:
+
+**Di docker-compose.yaml, update image names:**
+```yaml
+services:
+  db:
+    image: <ip-manager>:4000/database:latest  # Tambahkan :latest
+  backend:
+    image: <ip-manager>:4000/backend:latest   # Tambahkan :latest
+  frontend:
+    image: <ip-manager>:4000/frontend:latest  # Tambahkan :latest
+  nginx-frontend:
+    image: <ip-manager>:4000/nginx-frontend:latest  # Tambahkan :latest
+  nginx-backend:
+    image: <ip-manager>:4000/nginx-backend:latest    # Tambahkan :latest
+```
+
+##### 6. Verifikasi Registry Container Berjalan
+
+**Di Manager Node:**
+```bash
+# Cek registry container
+docker ps | grep registry
+
+# Jika tidak berjalan, start registry
+docker run -d -p 4000:5000 --restart=always --name registry registry:2
+
+# Verifikasi registry berjalan
+curl http://localhost:4000/v2/_catalog
+```
+
+##### 7. Deploy Ulang Stack
+
+Setelah semua langkah di atas:
+
+**Di Manager Node:**
+```bash
+# Remove stack yang gagal (jika ada)
+docker stack rm musicapp
+
+# Tunggu beberapa detik
+sleep 5
+
+# Deploy ulang
+docker stack deploy -c docker-compose.yaml musicapp
+
+# Monitor deployment
+docker stack services musicapp
+docker stack ps musicapp
+```
+
+##### 8. Cek Log Service untuk Detail Error
+
+**Di Manager Node:**
+```bash
+# Cek detail service yang gagal
+docker service ps musicapp_db --no-trunc
+
+# Cek logs (jika service sudah running)
+docker service logs musicapp_db
+```
+
+##### 9. Solusi Cepat (Quick Fix)
+
+Jika semua langkah di atas sudah dilakukan:
+
+```bash
+# Di Manager Node
+# 1. Pastikan semua images di-tag dan di-push
+docker images | grep "<ip-manager>:4000"
+docker compose push
+
+# 2. Verifikasi di registry
+curl http://<ip-manager>:4000/v2/_catalog
+
+# 3. Di semua Worker Node - verifikasi insecure registry
+cat /etc/docker/daemon.json
+sudo systemctl restart docker
+
+# 4. Di Manager Node - remove dan deploy ulang
+docker stack rm musicapp
+sleep 10
+docker stack deploy -c docker-compose.yaml musicapp
+
+# 5. Monitor
+watch docker stack services musicapp
+```
+
+##### 10. Tips Pencegahan
+
+1. **Selalu push images sebelum deploy:**
+   ```bash
+   docker compose push
+   ```
+
+2. **Verifikasi images di registry:**
+   ```bash
+   curl http://<ip-manager>:4000/v2/_catalog
+   ```
+
+3. **Gunakan tag eksplisit:**
+   - Gunakan `:latest` atau versi spesifik di docker-compose.yaml
+   - Hindari mengandalkan default tag
+
+4. **Test pull dari worker node:**
+   ```bash
+   # Di worker node
+   docker pull <ip-manager>:4000/database
+   ```
+
+5. **Monitor deployment:**
+   ```bash
+   watch docker stack services musicapp
+   docker stack ps musicapp
+   ```
 
 ### Tambahan
 

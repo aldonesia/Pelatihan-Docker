@@ -389,11 +389,33 @@ Aplikasi terdiri dari 5 services dengan konfigurasi replicas:
 - [ ] Verifikasi api-network terbuat dan terhubung
 - [ ] Test connectivity: `curl http://<ip-manager>:8000`
 
-**Masalah: Images tidak bisa di-pull di worker nodes**
-- [ ] Verifikasi insecure-registries configuration
-- [ ] Test registry access: `curl http://<ip-manager>:4000/v2/_catalog`
-- [ ] Restart Docker daemon di worker nodes
-- [ ] Cek firewall rules
+**Masalah: Images tidak bisa di-pull di worker nodes / No such image error**
+- Error: `No such image: <ip-manager>:4000/database:latest`
+- Error: Service status `Shutdown Rejected "No such image"`
+- [ ] **Verifikasi images sudah di-push ke registry**
+  - Manager: `curl http://<ip-manager>:4000/v2/_catalog | json_pp`
+  - Pastikan semua images ada: database, backend, frontend, nginx-frontend, nginx-backend
+- [ ] **Tag dan push images dengan benar**
+  - Manager: `docker tag <image-name> <ip-manager>:4000/<image-name>`
+  - Manager: `docker push <ip-manager>:4000/<image-name>` (untuk semua images)
+  - Atau: `docker compose push`
+- [ ] **Verifikasi registry dapat diakses dari worker node**
+  - Worker: `curl http://<ip-manager>:4000/v2/_catalog`
+  - Worker: `docker pull <ip-manager>:4000/database` (test pull)
+- [ ] **Verifikasi insecure-registries configuration**
+  - Worker: `cat /etc/docker/daemon.json` (harus ada `insecure-registries`)
+  - Worker: `sudo systemctl restart docker`
+  - Worker: `docker info | grep -i "insecure registries"`
+- [ ] **Update docker-compose.yaml dengan tag eksplisit**
+  - Tambahkan `:latest` di semua image names
+  - Contoh: `image: <ip-manager>:4000/database:latest`
+- [ ] **Verifikasi registry container berjalan**
+  - Manager: `docker ps | grep registry`
+  - Manager: Start registry jika tidak berjalan
+- [ ] **Deploy ulang stack**
+  - Manager: `docker stack rm musicapp`
+  - Manager: `docker stack deploy -c docker-compose.yaml musicapp`
+  - Manager: Monitor: `docker stack services musicapp`
 
 **Masalah: Error container_name dengan replicas**
 - Error: `services.deploy.replicas: can't set container_name and backend as container name must be unique: invalid compose project`
@@ -410,6 +432,41 @@ Aplikasi terdiri dari 5 services dengan konfigurasi replicas:
   - `docker stack deploy -c docker-compose.yaml musicapp`
 - [ ] **Verifikasi container names**
   - `docker stack ps musicapp` untuk melihat nama container yang dibuat otomatis
+
+**Masalah: Build error - Debian repository 404 Not Found**
+- Error: `404 Not Found` untuk `http://deb.debian.org/debian buster Release`
+- Error: `The repository 'http://deb.debian.org/debian buster Release' does not have a Release file`
+- [ ] **Update base image di Dockerfile**
+  - Backend: Ganti `FROM node:14` menjadi `FROM node:18`
+  - Frontend: Ganti `FROM node:14` menjadi `FROM node:16` (untuk kompatibilitas dengan Next.js 10)
+  - Node.js 16 dan 18 menggunakan Debian Bullseye yang masih didukung
+- [ ] **Alternatif: Update APT sources untuk Buster**
+  - Tambahkan di Dockerfile sebelum `apt-get update`:
+    ```dockerfile
+    RUN sed -i 's/deb.debian.org/archive.debian.org/g' /etc/apt/sources.list && \
+        sed -i '/security.debian.org/d' /etc/apt/sources.list
+    ```
+  - Catatan: Ini hanya solusi sementara, upgrade base image lebih disarankan
+- [ ] **Bersihkan apt cache**
+  - Tambahkan `rm -rf /var/lib/apt/lists/*` setelah `apt-get install` untuk mengurangi ukuran image
+- [ ] **Build ulang**
+  - `docker compose build`
+  - Verifikasi: `docker images`
+
+**Masalah: Next.js build error dengan Node.js 18**
+- Error: `ERR_PACKAGE_PATH_NOT_EXPORTED: Package subpath './lib/parser' is not defined by "exports"`
+- [ ] **Gunakan Node.js 16 untuk frontend**
+  - Next.js 10.0.6 lebih kompatibel dengan Node.js 16
+  - Update Dockerfile frontend: `FROM node:16`
+- [ ] **Install semua dependencies**
+  - Gunakan `npm install` (bukan `npm install --production`)
+  - Next.js memerlukan devDependencies untuk build
+- [ ] **Install sharp secara eksplisit**
+  - `RUN npm install sharp`
+  - Diperlukan untuk Next.js image optimization
+- [ ] **Verifikasi build**
+  - `docker compose build frontend`
+  - Pastikan build berhasil tanpa error
 
 **Masalah: Docker tidak bisa start setelah edit daemon.json**
 - Error: `invalid character`, `unexpected end of JSON input`, atau `invalid value`
