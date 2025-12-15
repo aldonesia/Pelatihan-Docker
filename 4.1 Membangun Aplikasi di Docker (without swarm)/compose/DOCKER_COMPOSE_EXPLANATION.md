@@ -4,7 +4,9 @@ Dokumen ini menjelaskan konfigurasi file `docker-compose.yaml` untuk aplikasi mi
 
 ## Struktur Umum
 
-File `docker-compose.yaml` menggunakan format YAML dengan versi `3.8`. File ini mendefinisikan 5 services, 3 networks, dan 3 volumes.
+File `docker-compose.yaml` menggunakan format YAML. File ini mendefinisikan 5 services, 3 networks, dan 3 volumes.
+
+> **Catatan**: Docker Compose v2 tidak lagi memerlukan atribut `version` di file docker-compose.yaml. Atribut tersebut sudah obsolete dan akan diabaikan.
 
 ## Services
 
@@ -115,7 +117,7 @@ nginx-frontend:
   depends_on:
     - frontend
   ports:
-    - '6000:80'
+    - '3000:80'
   build:
     context: ./nginx
     dockerfile: Dockerfile-frontend
@@ -125,7 +127,7 @@ nginx-frontend:
 
 **Penjelasan:**
 - **ports**: Port mapping dari host ke container
-  - `'6000:80'`: Port 6000 di host di-mapping ke port 80 di container
+  - `'3000:80'`: Port 3000 di host di-mapping ke port 80 di container
 - **depends_on**: Nginx-frontend menunggu `frontend` siap
 - **networks**: Terhubung ke `web-network` untuk komunikasi dengan frontend
 
@@ -137,7 +139,7 @@ nginx-backend:
   depends_on:
     - backend
   ports:
-    - '5000:8080'
+    - '8000:8080'
   build:
     context: ./nginx
     dockerfile: Dockerfile-backend
@@ -148,7 +150,7 @@ nginx-backend:
 
 **Penjelasan:**
 - **ports**: Port mapping dari host ke container
-  - `'5000:8080'`: Port 5000 di host di-mapping ke port 8080 di container
+  - `'8000:8080'`: Port 8000 di host di-mapping ke port 8080 di container
 - **networks**: Terhubung ke 2 jaringan:
   - `web-network`: Untuk komunikasi dengan frontend (jika diperlukan)
   - `api-network`: Untuk komunikasi dengan backend
@@ -206,16 +208,16 @@ Volume local biasanya disimpan di:
 
 ## Alur Komunikasi
 
-1. **Client → Nginx Frontend (Port 6000)**
-   - Client mengakses aplikasi melalui browser pada port 6000
+1. **Client → Nginx Frontend (Port 3000)**
+   - Client mengakses aplikasi melalui browser pada port 3000
    - Request diterima oleh nginx-frontend
 
 2. **Nginx Frontend → Frontend**
    - Nginx-frontend mem-forward request ke container frontend
    - Komunikasi melalui `web-network`
 
-3. **Frontend → Nginx Backend (Port 5000)**
-   - Jika frontend perlu data dari backend, request dikirim ke nginx-backend pada port 5000
+3. **Frontend → Nginx Backend (Port 8000)**
+   - Jika frontend perlu data dari backend, request dikirim ke nginx-backend pada port 8000
    - Komunikasi melalui `web-network` atau `api-network`
 
 4. **Nginx Backend → Backend**
@@ -277,7 +279,7 @@ docker compose up -d --scale backend=2
 ### Container tidak bisa start
 - Cek logs: `docker compose logs <service-name>`
 - Verifikasi Dockerfile dan dependencies
-- Pastikan port tidak digunakan: `lsof -i :6000` atau `lsof -i :5000`
+- Pastikan port tidak digunakan: `lsof -i :3000` atau `lsof -i :8000`
 
 ### Database connection error
 - Pastikan service `db` sudah running: `docker compose ps`

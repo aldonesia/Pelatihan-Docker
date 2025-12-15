@@ -1,4 +1,4 @@
-FROM node:14
+FROM node:18
 
 WORKDIR /usr/src/backend
 
@@ -6,7 +6,8 @@ COPY package*.json ./
 
 RUN npm install --production
 RUN apt-get update && \
-    apt-get install -y net-tools postgresql-client
+    apt-get install -y net-tools postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
 
 
 COPY . .

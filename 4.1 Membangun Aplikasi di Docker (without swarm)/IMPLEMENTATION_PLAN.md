@@ -7,14 +7,14 @@ Membangun dan menjalankan aplikasi microservice menggunakan Docker Compose tanpa
 - Docker dan Docker Compose terinstall
 - Git terinstall
 - Minimal 4GB RAM tersedia
-- Port 6000 (frontend) dan 5000 (backend) tersedia
+- Port 3000 (frontend) dan 8000 (backend) tersedia
 
 ## Arsitektur Aplikasi
 
 Aplikasi terdiri dari 5 services:
-1. **nginx-frontend**: Web server untuk frontend (Port 6000)
+1. **nginx-frontend**: Web server untuk frontend (Port 3000)
 2. **frontend**: Aplikasi Next.js
-3. **nginx-backend**: Web server untuk backend (Port 5000)
+3. **nginx-backend**: Web server untuk backend (Port 8000)
 4. **backend**: Aplikasi Node.js/Express
 5. **database**: PostgreSQL database
 
@@ -54,7 +54,7 @@ Aplikasi terdiri dari 5 services:
 - [ ] Pastikan semua container berstatus "Up"
 
 ### Fase 5: Verifikasi
-- [ ] Akses aplikasi melalui browser: `http://localhost:6000`
+- [ ] Akses aplikasi melalui browser: `http://localhost:3000`
 - [ ] Test fitur login/register
 - [ ] Verifikasi koneksi ke database
 - [ ] Cek logs jika ada error: `docker compose logs`
@@ -72,7 +72,7 @@ Aplikasi terdiri dari 5 services:
 
 ### Masalah: Port sudah digunakan
 **Solusi**: 
-- Cek port yang digunakan: `lsof -i :6000` atau `lsof -i :5000`
+- Cek port yang digunakan: `lsof -i :3000` atau `lsof -i :8000`
 - Stop service yang menggunakan port tersebut
 - Atau ubah port di docker-compose.yaml
 

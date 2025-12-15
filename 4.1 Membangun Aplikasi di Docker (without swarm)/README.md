@@ -149,7 +149,7 @@ Secara umum, gambaran tentang arsitektur aplikasi yang akan digunakan seperti be
 
 ![Arsitektur App](../img/app-arch.png)
 
-Pada gambar tersebut terdapat 5 services (**`nginx-frontend`**, **`frontend`**, **`nginx-backend`**, **`backend`**, dan **`database`**). **`nginx-frontend`** dan **`nginx-backend`** sama-sama bertugas sebagai web-server (penjelasan tentang masing-masing istilah dapat dilihat pada subbab [Pengantar Aplikasi Web](#pengantar-aplikasi-web)). **`nginx-frontend`** berjalan pada port **6000** dan **`nginx-backend`** berjalan pada port **5000**. Alur aplikasinya sebagai berikut:
+Pada gambar tersebut terdapat 5 services (**`nginx-frontend`**, **`frontend`**, **`nginx-backend`**, **`backend`**, dan **`database`**). **`nginx-frontend`** dan **`nginx-backend`** sama-sama bertugas sebagai web-server (penjelasan tentang masing-masing istilah dapat dilihat pada subbab [Pengantar Aplikasi Web](#pengantar-aplikasi-web)). **`nginx-frontend`** berjalan pada port **3000** dan **`nginx-backend`** berjalan pada port **8000**. Alur aplikasinya sebagai berikut:
 
 1. Pada client side, client akan mengakses aplikasi menggunakan web browser masing-masing.
 2. Web browser akan meneruskan permintaan client ke server, selanjutnya akan diurus oleh server (client sudah tidak perlu melakukan apa-apa lagi).
@@ -179,17 +179,26 @@ Pada folder **`nginx/`** terdapat 2 file, **`nginx-frontend.conf`** dan **`nginx
 
 #### 3. Konfigurasi File Environment
 
-> Jika dideploy pada localhost, maka lewati langkah berikut dan bisa langsung ke langkah [4. Build dan Menjalankan Aplikasi](#4-build-dan-menjalankan-aplikasi)
-
-Pada folder **`frontend/`** terdapat file **`.env`** yang perlu dikonfigurasi. Yang perlu dilakukan adalah mengubah nilai nya sesuai yang diinginkan.
+Pada folder **`frontend/`** perlu dibuat file **`.env`** untuk konfigurasi environment variables. File **`.env.example`** sudah tersedia sebagai template. Untuk membuat file **`.env`**, salin dari **`.env.example`**:
 
 ```
-NEXT_PUBLIC_APP_NAME="<nama-aplikasi>"
-NEXT_PUBLIC_API_ENDPOINT="http://<alamat-nginx-backend>:5000/" 
+cp frontend/.env.example frontend/.env
 ```
 
+Atau buat file **`.env`** secara manual dengan isi berikut:
+
+```
+NEXT_PUBLIC_APP_NAME="Music App"
+NEXT_PUBLIC_API_ENDPOINT="http://localhost:8000/" 
+```
+
+**Penjelasan:**
 * **`NEXT_PUBLIC_APP_NAME`**: Nama dari aplikasi yang akan ditampilkan di Frontend
-* **`NEXT_PUBLIC_API_ENDPOINT`**: Alamat dari web server untuk **`backend`** (menggunakan port 5000), dapat diisi dengan domain name atau IP public server. Contoh: `http://localhost:5000/` atau `http://192.168.1.100:5000/`
+* **`NEXT_PUBLIC_API_ENDPOINT`**: Alamat dari web server untuk **`backend`** (menggunakan port 8000). 
+  - Untuk localhost: `http://localhost:8000/`
+  - Untuk server remote: `http://<ip-server>:8000/` atau `http://<domain-name>:8000/`
+
+> **Penting**: Pastikan **`NEXT_PUBLIC_API_ENDPOINT`** menggunakan port **8000** (bukan 5000) dan diakhiri dengan slash (`/`). File **`.env`** harus dibuat sebelum melakukan build frontend.
 
 #### 4. Build dan Menjalankan Aplikasi
 
@@ -225,7 +234,7 @@ docker compose ps
 
 Perintah ini akan menampilkan status dari semua container yang sedang berjalan. Pastikan bahwa semua container memiliki status **`Up`**.
 
-Selain itu, karena aplikasi ini berbasis web, aplikasi dapat dicek melalui web browser dengan memasukkan alamat **`http://localhost:6000`** atau **`http://<ip-server>:6000`**.
+Selain itu, karena aplikasi ini berbasis web, aplikasi dapat dicek melalui web browser dengan memasukkan alamat **`http://localhost:3000`** atau **`http://<ip-server>:3000`**.
 
 ![Tampilan Aplikasi](../img/app-login.png)
 

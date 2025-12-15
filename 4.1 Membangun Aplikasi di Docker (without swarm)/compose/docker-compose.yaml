@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     container_name: db
@@ -47,6 +46,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_ENDPOINT=http://localhost:8000/
+        - NEXT_PUBLIC_APP_NAME=Music App
     depends_on:
       - backend
     volumes:
@@ -59,7 +61,7 @@ services:
     depends_on:
       - frontend
     ports:
-      - '6000:80'
+      - '3000:80'
     build:
       context: ./nginx
       dockerfile: Dockerfile-frontend
@@ -71,7 +73,7 @@ services:
     depends_on:
       - backend
     ports:
-      - '5000:8080'
+      - '8000:8080'
     build:
       context: ./nginx
       dockerfile: Dockerfile-backend
