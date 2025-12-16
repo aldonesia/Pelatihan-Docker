@@ -7,7 +7,7 @@ Membangun dan menjalankan aplikasi microservice menggunakan Docker Swarm pada mu
 
 ### Hardware & Software
 - **4 Node** (1 Manager + 3 Worker):
-  - Minimal 2GB RAM per node
+  - Minimal 1GB RAM per node
   - Docker Engine terinstall di semua node
   - Network connectivity antar node
   - SSH access ke semua node
